@@ -56,8 +56,8 @@ class AuthService:
         db.session.commit()
         
         # Generate tokens
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
+        access_token = create_access_token(identity=str(user.id))
+        refresh_token = create_refresh_token(identity=str(user.id))
         
         return {
             'message': 'Login successful',
@@ -127,7 +127,7 @@ class AuthService:
     @staticmethod
     def refresh_access_token(user_id):
         """Create new access token"""
-        access_token = create_access_token(identity=user_id)
+        access_token = create_access_token(identity=str(user_id))
         return {'access_token': access_token}, 200
     
     @staticmethod
@@ -137,3 +137,18 @@ class AuthService:
         if not user:
             return {'error': 'User not found'}, 404
         return {'user': user.to_dict()}, 200
+        
+    
+
+    @staticmethod
+    def delete_user_by_id(user_id):
+        """Delete a user by ID"""
+        user = User.query.get(user_id)
+    
+        if not user:
+            return {'error': 'User not found'}, 404
+    
+        db.session.delete(user)
+        db.session.commit()
+    
+        return {'message': 'User deleted successfully'}, 200
