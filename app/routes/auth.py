@@ -151,3 +151,21 @@ def logout():
     """Logout user (client-side token removal)"""
     # In a production app, you might want to implement token blacklisting
     return jsonify({'message': 'Logged out successfully'}), 200
+
+
+@auth_bp.route('/delete-user/<int:user_id>', methods=['DELETE'])
+@jwt_required()
+def delete_user(user_id):
+    """Delete a specific user by ID"""
+    try:
+        current_user_id = int(get_jwt_identity())
+
+        # Optional: allow only self-deletion or admin check
+        if current_user_id != user_id:
+            return jsonify({'error': 'You are not authorized to delete this user'}), 403
+
+        result, status_code = AuthService.delete_user_by_id(user_id)
+        return jsonify(result), status_code
+
+    except Exception as e:
+        return jsonify({'error': 'User deletion failed'}), 500
