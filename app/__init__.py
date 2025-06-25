@@ -4,6 +4,7 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_mail import Mail
 from flask_cors import CORS
+from sqlalchemy import text
 from app.config import config
 
 db = SQLAlchemy()
@@ -21,6 +22,14 @@ def create_app(config_name='default'):
     jwt.init_app(app)
     mail.init_app(app)
     CORS(app)
+    
+    # Test database connection
+    with app.app_context():
+        try:
+            db.session.execute(text('SELECT 1'))
+            print('✅ Database connected successfully')
+        except Exception as e:
+            print(f'❌ Database connection failed: {e}')
     
     # Register blueprints
     from app.routes.auth import auth_bp
