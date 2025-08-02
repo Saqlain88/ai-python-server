@@ -22,6 +22,9 @@ def create_app(config_name='default'):
     jwt.init_app(app)
     mail.init_app(app)
     CORS(app)
+
+    # ✅ Proper CORS setup
+    CORS(app, supports_credentials=True, origins=["http://localhost:3000", "https://multi-genie-ai.vercel.app"])
     
     # Test database connection
     with app.app_context():
