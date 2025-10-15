@@ -21,10 +21,12 @@ def create_app(config_name='default'):
     migrate.init_app(app, db)
     jwt.init_app(app)
     mail.init_app(app)
-    CORS(app)
-
+    
     # ✅ Proper CORS setup
-    CORS(app, supports_credentials=True, origins=["http://localhost:3000", "https://multi-genie-ai.vercel.app"])
+    CORS(app, supports_credentials=True, origins=[
+        "http://localhost:3000",
+        "https://multi-genie-ai.vercel.app"
+    ])
     
     # Test database connection
     with app.app_context():
@@ -37,11 +39,11 @@ def create_app(config_name='default'):
     # Register blueprints
     from app.routes.auth import auth_bp
     from app.routes.oauth import oauth_bp
-    from app.routes.ai import ai_bp
-    
+    from app.routes.ai_routes import ai_bp  # ✅ Add this import
+
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(oauth_bp, url_prefix='/api/oauth')
-    app.register_blueprint(ai_bp, url_prefix='/api/ai')
+    app.register_blueprint(ai_bp, url_prefix='/api/ai')  # ✅ Register AI route
     
     # JWT error handlers
     @jwt.expired_token_loader
