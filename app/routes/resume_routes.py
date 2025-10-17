@@ -9,6 +9,8 @@ from app.services.resume_service import (
 )
 from app import db
 
+from app.services.resume_service import analyze_resume_vs_job
+
 resume_bp = Blueprint("resume", __name__, url_prefix="/api/resume")
 
 
@@ -139,3 +141,22 @@ def send_to_hr(resume_id):
     pdf_bytes = generate_pdf_bytes(resume.template_id or "modern", resume.content)
     send_result = send_resume_to_hr(resume, hr_info, pdf_bytes)
     return jsonify(send_result), 200
+
+@resume_bp.route("/ats-match", methods=["POST"])
+@jwt_required()
+def ats_match():
+    """
+    Compare resume PDF with job description (text or file).
+    """
+    resume_file = request.files.get("resume")
+    jd_file = request.files.get("jd_file")
+    jd_text = request.form.get("jd_text")
+
+    if not resume_file:
+        return jsonify({"error": "Resume file is required"}), 400
+
+    try:
+        result = analyze_resume_vs_job(resume_file, job_description_text=jd_text, job_description_file=jd_file)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

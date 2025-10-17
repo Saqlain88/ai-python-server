@@ -17,3 +17,4 @@ gunicorn==21.2.0
 openai>=1.0.0
 weasyprint   # system deps required
 python-dotenv
+PyMuPDF

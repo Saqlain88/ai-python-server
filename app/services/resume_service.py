@@ -7,9 +7,18 @@ from weasyprint import HTML  # pip install weasyprint
 from flask_mail import Message
 from app import mail, db
 from app.models.resume import Resume
+import fitz  # PyMuPDF
+from werkzeug.utils import secure_filename
+import re
+import json
+
+
 
 # initialize openai client
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+UPLOAD_FOLDER = os.path.join(os.getcwd(), "uploads")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # You may store simple templates on disk or in DB. For demo, two simple template IDs:
 TEMPLATES = [
@@ -262,3 +271,178 @@ def send_resume_to_hr(resume: Resume, hr_info: dict, pdf_bytes: bytes):
     msg.attach(f"{resume.content.get('name','resume')}.pdf", "application/pdf", pdf_bytes)
     mail.send(msg)
     return {"status": "sent", "to": hr_info.get("hr_email")}
+
+
+def extract_text_from_pdf(file_path: str) -> str:
+    """Extract text from PDF file using PyMuPDF."""
+    text = ""
+    try:
+        with fitz.open(file_path) as pdf:
+            for page in pdf:
+                text += page.get_text("text")
+    except Exception as e:
+        raise RuntimeError(f"Error reading PDF: {e}")
+    return text.strip()
+
+def analyze_pdf_resume(file_storage) -> dict:
+    """
+    Save uploaded file temporarily, extract text, and run ATS check using OpenAI.
+    """
+    filename = secure_filename(file_storage.filename)
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    file_storage.save(file_path)
+
+    # Step 1: Extract text
+    text = extract_text_from_pdf(file_path)
+    if not text:
+        raise ValueError("Could not extract text from the PDF.")
+
+    # Step 2: Use AI to analyze resume content
+    prompt = f"""
+You are an expert ATS analyzer. Analyze the following resume text and return JSON ONLY with:
+- score: integer 0-100
+- rating: one of ['bad','average','good','excellent']
+- summary: short summary of resume strengths
+- suggestions: array of objects {{section, suggestion, importance}}
+
+Resume Text:
+{text[:6000]}  # truncate for token safety
+"""
+
+    try:
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        resp = openai_client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are an ATS resume evaluator that outputs JSON only."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.2,
+            max_tokens=800,
+        )
+        ai_response = resp.choices[0].message.content.strip()
+        result = json.loads(ai_response)
+
+        # Validate structure
+        score = int(result.get("score", 0))
+        if score < 40:
+            rating = "bad"
+        elif score < 60:
+            rating = "average"
+        elif score < 80:
+            rating = "good"
+        else:
+            rating = "excellent"
+
+        result["rating"] = rating
+        return result
+    except Exception as e:
+        raise RuntimeError(f"Error analyzing resume: {e}")
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+
+def analyze_resume_vs_job(resume_file, job_description_text=None, job_description_file=None):
+    """
+    Compare resume content (PDF) with job description text or file.
+    Return ATS match report.
+    """
+    filename = secure_filename(resume_file.filename)
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    resume_file.save(file_path)
+
+    # Extract resume text
+    resume_text = extract_text_from_pdf(file_path)
+
+    # Extract or read job description
+    jd_text = ""
+    if job_description_text:
+        jd_text = job_description_text
+    elif job_description_file:
+        jd_filename = secure_filename(job_description_file.filename)
+        jd_path = os.path.join(UPLOAD_FOLDER, jd_filename)
+        job_description_file.save(jd_path)
+        jd_text = extract_text_from_pdf(jd_path)
+        os.remove(jd_path)
+    else:
+        raise ValueError("Job description not provided.")
+
+    # Cleanup
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    # --- AI Prompt ---
+    prompt = f"""
+You are an ATS resume evaluator and recruiter assistant.
+Compare the following resume and job description.
+
+Return JSON ONLY with fields:
+- match_score: integer (0-100)
+- rating: one of ['bad','average','good','excellent']
+- missing_keywords: array of strings (keywords from JD missing in resume)
+- summary: short summary of alignment
+- suggestions: array of objects {{section, suggestion}}
+
+Resume:
+{resume_text[:6000]}
+
+Job Description:
+{jd_text[:3000]}
+"""
+
+    try:
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        response = openai_client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are an ATS resume evaluator that outputs JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=800,
+        )
+        # ai_response = response.choices[0].message.content.strip()
+
+        # print("\n\n🧠 RAW AI RESPONSE:\n", ai_response, "\n\n")  # 👈 Debug line
+
+        ai_response = response.choices[0].message.content.strip()
+        # print("\n\n🧠 RAW AI RESPONSE:\n", ai_response, "\n\n")
+
+        # --- Clean Markdown Wrappers ---
+        # Removes ```json ... ``` or ``` ... ```
+        cleaned = re.sub(r"^```[a-zA-Z]*\n|```$", "", ai_response, flags=re.MULTILINE).strip()
+
+        # --- Try to extract JSON if surrounded by extra text ---
+        try:
+            result = json.loads(cleaned)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+            if match:
+                result = json.loads(match.group())
+            else:
+                raise RuntimeError(f"AI returned invalid JSON after cleaning: {cleaned[:300]}")
+
+        # Try parsing safely
+        # try:
+        #     result = json.loads(ai_response)
+        # except json.JSONDecodeError as e:
+        #     raise RuntimeError(f"AI returned invalid JSON: {ai_response[:500]}")
+        #     # result = json.loads(ai_response)
+        # result = json.loads(ai_response)
+
+        score = int(result.get("match_score", 0))
+        if score < 40:
+            rating = "bad"
+        elif score < 60:
+            rating = "average"
+        elif score < 80:
+            rating = "good"
+        else:
+            rating = "excellent"
+
+        result["rating"] = rating
+        return result
+    except Exception as e:
+        raise RuntimeError(f"Error analyzing resume and job match: {e}")
+
