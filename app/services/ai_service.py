@@ -1,11 +1,12 @@
 import os
-import openai
 
-# Set API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+from openai import OpenAI
+
+client = OpenAI(
+  api_key=os.environ['OPENAI_API_KEY'],  # this is also the default, it can be omitted
+)
 model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-
-
+client = OpenAI()
 
 def generate_react_code(prompt: str) -> str:
     """
@@ -15,7 +16,7 @@ def generate_react_code(prompt: str) -> str:
         raise ValueError("Prompt cannot be empty")
 
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": "You are an AI React code generator."},
@@ -23,8 +24,7 @@ def generate_react_code(prompt: str) -> str:
             ],
             temperature=0.3
         )
-
-        return response.choices[0].message["content"]
+        return response.choices[0].message.content
 
     except Exception as e:
         raise RuntimeError(f"Error generating code: {e}")
