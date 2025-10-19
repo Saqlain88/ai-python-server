@@ -4,7 +4,7 @@ import secrets
 
 class Token(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     token = db.Column(db.String(255), unique=True, nullable=False, index=True)
     token_type = db.Column(db.String(50), nullable=False)  # 'reset_password', 'email_verification'
     expires_at = db.Column(db.DateTime, nullable=False)
