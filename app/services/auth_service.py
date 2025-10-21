@@ -152,3 +152,5 @@ class AuthService:
         db.session.commit()
     
         return {'message': 'User deleted successfully'}, 200
+    
+    #CC
