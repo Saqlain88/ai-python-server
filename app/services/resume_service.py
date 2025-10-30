@@ -174,6 +174,7 @@ def render_resume_html(template_id: str, content: dict) -> str:
     # If you have Jinja templates, use render_template('resume_modern.html', content=content)
     # For demo fallback:
     name = content.get("name", "")
+    title = content.get("title", "")
     email = content.get("email", "")
     phone = content.get("phone", "")
     skills = content.get("skills", [])
@@ -193,6 +194,7 @@ def render_resume_html(template_id: str, content: dict) -> str:
     <body>
       <div class="header">
         <h1>{name}</h1>
+        <h3>{title}</h3>
         <div>{email} • {phone}</div>
       </div>
 
