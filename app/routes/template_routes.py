@@ -25,7 +25,7 @@ def create_template():
         
         # Get template data from form
         name = request.form.get('name')
-        description = request.form.get('description')
+        category = request.form.get('category')
         
         if not name:
             return jsonify({'error': 'Template name is required'}), 400
@@ -38,7 +38,7 @@ def create_template():
             # Create new template
             template = Template(
                 name=name,
-                description=description,
+                category=category
                 thumbnail_url=upload_result['secure_url'],
                 cloudinary_public_id=upload_result['public_id']
             )
@@ -90,8 +90,9 @@ def update_template(template_id):
     # Update template data
     if 'name' in request.form:
         template.name = request.form['name']
-    if 'description' in request.form:
-        template.description = request.form['description']
+        
+    if 'category' in request.form:
+        template.category = request.form['category']
         
     # Handle image update if present
     if 'image' in request.files:

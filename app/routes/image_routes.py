@@ -12,7 +12,7 @@ image_bp = Blueprint('images', __name__)
 @admin_required
 def create_template():
     try:
-        # Check if image file is present in request
+        # Check if image file is present in request        
         if 'image' not in request.files:
             return jsonify({'error': 'No image file uploaded'}), 400
             
@@ -25,7 +25,7 @@ def create_template():
         
         # Get template data from form
         name = request.form.get('name')
-        description = request.form.get('description')
+        category = request.form.get('category')
         
         if not name:
             return jsonify({'error': 'Template name is required'}), 400
@@ -40,7 +40,7 @@ def create_template():
                 title=name,
                 thumbnail=upload_result['secure_url'],
                 cloudinary_public_id=upload_result['public_id'],
-                category='Modern'  # Default category, update as needed
+                category=category  # Default category, update as needed
             )
             
             db.session.add(template)
@@ -90,6 +90,12 @@ def update_template(template_id):
     # Update template data
     if 'title' in request.form:
         template.title = request.form['title']
+    
+    if 'category' in request.form:
+        template.category = request.form['category']
+    
+    if 'image' not in request.files:
+            return jsonify({'error': 'No image file uploaded'}), 400
         
     # Handle image update if present
     if 'image' in request.files:
@@ -108,6 +114,6 @@ def update_template(template_id):
                 
             except Exception as e:
                 return jsonify({'error': f'Failed to update image: {str(e)}'}), 500
-    
+     
     db.session.commit()
     return jsonify(template.to_dict()), 200
