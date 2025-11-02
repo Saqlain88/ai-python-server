@@ -7,11 +7,14 @@ from weasyprint import HTML  # pip install weasyprint
 from flask_mail import Message
 from app import mail, db
 from app.models.resume import Resume
+from app.models.template import Template
 import fitz  # PyMuPDF
 from werkzeug.utils import secure_filename
 import re
 import json
-
+from app.services.image_service import ImageService
+import cloudinary.uploader
+import cloudinary
 
 
 # initialize openai client
@@ -26,17 +29,36 @@ TEMPLATES = [
     {"id": "classic", "name": "Classic"}
 ]
 
+# def upload_image(file_path, public_id=None):
+#     try:
+#         response = cloudinary.uploader.upload(
+#             file_path,
+#             public_id=public_id,
+#             overwrite=True,
+#             resource_type="image"
+#         )
+#         return response
+#     except Exception as e:
+#         print(f"Image upload failed: {e}")
+#         return None
+
+# def create_templates(title: str, thumbnail: str, category: str):
+#     response = ImageService.upload_image(thumbnail, public_id=f"uploads/{title.lower().replace(' ','_')}")
+#     if not response or 'secure_url' not in response:
+#         raise RuntimeError("Failed to upload template thumbnail to Cloudinary.")
+#     template = Template(title=title, thumbnail=response.secure_url, category=category)
+#     db.session.add(template)
+#     db.session.commit()
+#     return template
 
 def list_templates():
     return TEMPLATES
-
 
 def create_resume(user_id: int, template_id: str, content: dict) -> Resume:
     resume = Resume(user_id=user_id, template_id=template_id, content=content)
     db.session.add(resume)
     db.session.commit()
     return resume
-
 
 def update_resume(resume: Resume, content: dict = None, template_id: str = None) -> Resume:
     if content is not None:

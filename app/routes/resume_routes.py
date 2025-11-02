@@ -31,7 +31,7 @@ def create():
     return jsonify({"resume": resume.to_dict()}), 201
 
 
-@resume_bp.route("/<int:resume_id>", methods=["GET"])
+@resume_bp.route("/<string:resume_id>", methods=["GET"])
 @jwt_required()
 def get_resume(resume_id):
     user_id = get_jwt_identity()
@@ -41,7 +41,7 @@ def get_resume(resume_id):
     return jsonify({"resume": resume.to_dict()}), 200
 
 
-@resume_bp.route("/<int:resume_id>", methods=["PUT"])
+@resume_bp.route("/<string:resume_id>", methods=["PUT"])
 @jwt_required()
 def update(resume_id):
     user_id = get_jwt_identity()
@@ -55,7 +55,7 @@ def update(resume_id):
     return jsonify({"resume": resume.to_dict()}), 200
 
 
-@resume_bp.route("/<int:resume_id>/ats-check", methods=["POST"])
+@resume_bp.route("/<string:resume_id>/ats-check", methods=["POST"])
 @jwt_required()
 def ats_check(resume_id):
     user_id = get_jwt_identity()
@@ -81,7 +81,7 @@ def ats_check(resume_id):
     return jsonify({"score": score, "rating": rating, "summary": result.get("summary"), "suggestions": result.get("suggestions")}), 200
 
 
-@resume_bp.route("/<int:resume_id>/suggestions", methods=["POST"])
+@resume_bp.route("/<string:resume_id>/suggestions", methods=["POST"])
 @jwt_required()
 def suggestions(resume_id):
     user_id = get_jwt_identity()
@@ -94,7 +94,7 @@ def suggestions(resume_id):
     return jsonify(suggestions), 200
 
 
-@resume_bp.route("/<int:resume_id>/apply-modification", methods=["POST"])
+@resume_bp.route("/<string:resume_id>/apply-modification", methods=["POST"])
 @jwt_required()
 def apply_mod(resume_id):
     user_id = get_jwt_identity()
@@ -111,7 +111,7 @@ def apply_mod(resume_id):
     return jsonify({"resume": updated.to_dict()}), 200
 
 
-@resume_bp.route("/<int:resume_id>/download", methods=["GET"])
+@resume_bp.route("/<string:resume_id>/download", methods=["GET"])
 @jwt_required()
 def download_resume(resume_id):
     user_id = get_jwt_identity()
@@ -122,7 +122,7 @@ def download_resume(resume_id):
     return send_file(BytesIO(pdf_bytes), mimetype="application/pdf", as_attachment=True, download_name=f"{resume.content.get('name','resume')}.pdf")
 
 
-@resume_bp.route("/<int:resume_id>/send", methods=["POST"])
+@resume_bp.route("/<string:resume_id>/send", methods=["POST"])
 @jwt_required()
 def send_to_hr(resume_id):
     user_id = get_jwt_identity()
@@ -160,3 +160,13 @@ def ats_match():
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@resume_bp.route("/template", methods=["POST"])
+@jwt_required()
+def create_template():
+    data = request.get_json()
+    title = data.get("title")
+    thumbnail = request.files.get("thumbnail")
+    category = data.get("category")
+    template = create_resume(title=title, thumbnail=thumbnail, category=category)
+    return jsonify({"template": template.to_dict()}), 201

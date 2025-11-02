@@ -1,12 +1,13 @@
 from datetime import datetime
 from app import db
 from sqlalchemy.dialects.postgresql import JSON
+import uuid
 
 class Resume(db.Model):
     __tablename__ = "resumes"
 
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False, index=True)
     template_id = db.Column(db.String(100), nullable=True)
     content = db.Column(JSON, nullable=False)  # stores the resume JSON described by you
     ats_score = db.Column(db.Integer, nullable=True)

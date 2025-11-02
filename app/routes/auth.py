@@ -153,7 +153,7 @@ def logout():
     return jsonify({'message': 'Logged out successfully'}), 200
 
 
-@auth_bp.route('/delete-user/<int:user_id>', methods=['DELETE'])
+@auth_bp.route('/delete-user/<string:user_id>', methods=['DELETE'])
 @jwt_required()
 def delete_user(user_id):
     """Delete a specific user by ID"""

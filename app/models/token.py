@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
 from app import db
 import secrets
+import uuid
 
 class Token(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
     token = db.Column(db.String(255), unique=True, nullable=False, index=True)
     token_type = db.Column(db.String(50), nullable=False)  # 'reset_password', 'email_verification'
     expires_at = db.Column(db.DateTime, nullable=False)

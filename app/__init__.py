@@ -6,6 +6,7 @@ from flask_mail import Mail
 from flask_cors import CORS
 from sqlalchemy import text
 from app.config import config
+import os
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -39,14 +40,15 @@ def create_app(config_name='default'):
     # Register blueprints
     from app.routes.auth import auth_bp
     from app.routes.oauth import oauth_bp
-    from app.routes.ai_routes import ai_bp  # ✅ Add this import
+    from app.routes.ai_routes import ai_bp
     from app.routes.resume_routes import resume_bp
+    from app.routes.image_routes import image_bp
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(oauth_bp, url_prefix='/api/oauth')
-    app.register_blueprint(ai_bp, url_prefix='/api/ai')  # ✅ Register AI route
-
+    app.register_blueprint(ai_bp, url_prefix='/api/ai')
     app.register_blueprint(resume_bp, url_prefix='/api/resume')
+    app.register_blueprint(image_bp, url_prefix='/api/images')
     
     # JWT error handlers
     @jwt.expired_token_loader

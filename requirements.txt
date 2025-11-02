@@ -19,3 +19,5 @@ weasyprint   # system deps required
 python-dotenv
 PyMuPDF
 psycopg2
+cloudinary
+Flask-Migrate
