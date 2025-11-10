@@ -3,3 +3,4 @@ venv/
 .env.example
 __pycache__/
 .venv/pyvenv.cfg
+uploads
