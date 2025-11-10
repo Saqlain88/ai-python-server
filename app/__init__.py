@@ -43,12 +43,14 @@ def create_app(config_name='default'):
     from app.routes.ai_routes import ai_bp
     from app.routes.resume_routes import resume_bp
     from app.routes.image_routes import image_bp
+    from app.routes.agent_route import agent_bp
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(oauth_bp, url_prefix='/api/oauth')
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
     app.register_blueprint(resume_bp, url_prefix='/api/resume')
     app.register_blueprint(image_bp, url_prefix='/api/images')
+    app.register_blueprint(agent_bp, url_prefix='/api')
     
     # JWT error handlers
     @jwt.expired_token_loader

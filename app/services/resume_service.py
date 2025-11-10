@@ -15,6 +15,7 @@ import json
 from app.services.image_service import ImageService
 import cloudinary.uploader
 import cloudinary
+from app.services.hf_service import generate_text, generate_json, HFError
 
 
 # initialize openai client
@@ -465,6 +466,160 @@ Job Description:
         else:
             rating = "excellent"
 
+        result["rating"] = rating
+        return result
+    except Exception as e:
+        raise RuntimeError(f"Error analyzing resume and job match: {e}")
+    
+
+# --- ADD: HF-based ATS resume analysis (structured JSON) ---
+def ats_check_resume_hf(resume_content: dict) -> dict:
+    """
+    Hugging Face version of ATS check that returns:
+    { score:int, summary:str, suggestions:[{section, suggestion, importance}] }
+    """
+    prompt = f"""
+You are an expert ATS resume reviewer. The user will give you a resume JSON.
+Return a JSON object EXACTLY with the following keys:
+- score: integer 0-100 (higher is better)
+- summary: short text (1-3 sentences)
+- suggestions: array of objects with keys: section (e.g. experience, skills, projects), suggestion (text), importance (low|medium|high)
+Analyze for ATS compliance, keyword usage, formatting, and length. Do not include any other keys.
+
+Resume JSON:
+{json.dumps(resume_content, indent=2)}
+"""
+    try:
+        parsed = generate_json(prompt, max_new_tokens=800, temperature=0.2)
+        score = int(parsed.get("score", 0))
+        return {
+            "score": score,
+            "summary": parsed.get("summary", ""),
+            "suggestions": parsed.get("suggestions", []),
+            "raw": json.dumps(parsed)
+        }
+    except Exception as e:
+        return {
+            "score": 40,
+            "summary": "Automated analysis unavailable. Try again later.",
+            "suggestions": [{"section": "general", "suggestion": "Retry ATS check.", "importance": "low"}],
+            "error": str(e)
+        }
+
+# --- ADD: HF-based email generation for HR ---
+def generate_hr_email_hf(resume: Resume, hr_info: dict) -> dict:
+    """
+    hr_info: { hr_name, hr_email, company_name, company_address, company_email, experience_applied_for }
+    Returns {subject, body}
+    """
+    prompt = f"""
+You are an expert professional who writes concise, persuasive outreach emails to HR/Recruiters to apply for roles.
+Candidate resume JSON:
+{json.dumps(resume.content, indent=2)}
+
+Target HR/contact:
+{json.dumps(hr_info, indent=2)}
+
+Write a professional email subject and body. Keep body polite, concise (<= 300 words), mention 2-3 key achievements from resume, and include a short closing.
+Return a JSON object with exactly: {{ "subject":"...", "body":"..." }}
+"""
+    try:
+        return generate_json(prompt, max_new_tokens=600, temperature=0.5)
+    except Exception as e:
+        return {"subject": f"Application - {resume.content.get('name','Candidate')}", "body": "Please contact candidate. Error generating email: " + str(e)}
+
+# --- ADD: HF-based PDF resume text analysis (single file) ---
+def analyze_pdf_resume_hf(file_storage) -> dict:
+    """
+    Save uploaded file temporarily, extract text, and run ATS check using HF.
+    """
+    filename = secure_filename(file_storage.filename)
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    file_storage.save(file_path)
+
+    text = extract_text_from_pdf(file_path)
+    if not text:
+        raise ValueError("Could not extract text from the PDF.")
+
+    prompt = f"""
+You are an expert ATS analyzer. Analyze the following resume text and return JSON ONLY with:
+- score: integer 0-100
+- rating: one of ['bad','average','good','excellent']
+- summary: short summary of resume strengths
+- suggestions: array of objects {{section, suggestion, importance}}
+Resume Text:
+{text[:6000]}
+"""
+    try:
+        result = generate_json(prompt, max_new_tokens=800, temperature=0.2)
+        score = int(result.get("score", 0))
+        if score < 40:
+            rating = "bad"
+        elif score < 60:
+            rating = "average"
+        elif score < 80:
+            rating = "good"
+        else:
+            rating = "excellent"
+        result["rating"] = rating
+        return result
+    except Exception as e:
+        raise RuntimeError(f"Error analyzing resume: {e}")
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+# --- ADD: HF-based resume vs JD comparison ---
+def analyze_resume_vs_job_hf(resume_file, job_description_text=None, job_description_file=None):
+    filename = secure_filename(resume_file.filename)
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    resume_file.save(file_path)
+
+    resume_text = extract_text_from_pdf(file_path)
+
+    jd_text = ""
+    if job_description_text:
+        jd_text = job_description_text
+    elif job_description_file:
+        jd_filename = secure_filename(job_description_file.filename)
+        jd_path = os.path.join(UPLOAD_FOLDER, jd_filename)
+        job_description_file.save(jd_path)
+        jd_text = extract_text_from_pdf(jd_path)
+        os.remove(jd_path)
+    else:
+        raise ValueError("Job description not provided.")
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    prompt = f"""
+You are an ATS resume evaluator and recruiter assistant.
+Compare the following resume and job description.
+
+Return JSON ONLY with fields:
+- match_score: integer (0-100)
+- rating: one of ['bad','average','good','excellent']
+- missing_keywords: array of strings (keywords from JD missing in resume)
+- summary: short summary of alignment
+- suggestions: array of objects {{section, suggestion}}
+
+Resume:
+{resume_text[:6000]}
+
+Job Description:
+{jd_text[:3000]}
+"""
+    try:
+        result = generate_json(prompt, max_new_tokens=800, temperature=0.3)
+        score = int(result.get("match_score", 0))
+        if score < 40:
+            rating = "bad"
+        elif score < 60:
+            rating = "average"
+        elif score < 80:
+            rating = "good"
+        else:
+            rating = "excellent"
         result["rating"] = rating
         return result
     except Exception as e:
